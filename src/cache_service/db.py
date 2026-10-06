@@ -20,12 +20,7 @@ SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def init_db() -> None:
-    """Create tables if missing.
-
-    A deliberate shortcut: a service that owns its schema over time would use
-    Alembic migrations. For a task of this size, with only additive schema,
-    create_all keeps the repository readable.
-    """
+    """Create tables if missing. A shortcut; Alembic in production - see README."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

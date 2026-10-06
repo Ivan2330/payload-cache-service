@@ -30,8 +30,7 @@ async def create_payload(
         session, transformer, request.list_1, request.list_2
     )
     # 201 either way: the identifier is deterministic, so a repeat is the same
-    # resource rather than a conflict, and the client should not have to care
-    # which of its requests arrived first. "created" says which happened.
+    # resource rather than a conflict. "created" says which happened.
     return PayloadCreated(
         id=identifier,
         created=created,

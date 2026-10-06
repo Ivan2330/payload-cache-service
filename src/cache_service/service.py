@@ -1,8 +1,7 @@
 """Business logic: identity of a payload, caching, and assembly.
 
-Kept free of FastAPI on purpose - these functions take a session and a
-transformer and nothing else, so the tests exercise the real caching behaviour
-without an HTTP layer in the way.
+No FastAPI imports here on purpose: these functions take a session and a
+transformer, nothing else.
 """
 
 import hashlib
@@ -28,15 +27,9 @@ def interleave(list_1: Sequence[str], list_2: Sequence[str]) -> list[str]:
 
 
 def payload_id(list_1: Sequence[str], list_2: Sequence[str]) -> str:
-    """Identify a request by its content.
+    """Identify a request by its content, which makes a repeat free to detect.
 
-    The identifier is a hash of the canonical form of the input, which gives
-    idempotency for free: the same two lists always produce the same id, so a
-    repeated POST needs no lookup table and cannot race another request into
-    creating a second identifier for the same payload.
-
-    Order matters - ["a"], ["b"] is a different payload from ["b"], ["a"] - so
-    the lists are hashed as they arrive, and as two separate keys so that
+    Order matters, and the two lists are hashed as separate keys so that
     ["ab"], ["c"] cannot collide with ["a"], ["bc"].
     """
     canonical = json.dumps(
@@ -56,12 +49,8 @@ async def _insert_ignoring_conflicts(session: AsyncSession, table, rows: list[di
     """Insert rows, skipping ones another request inserted first.
 
     Two requests can legitimately be transforming the same string at the same
-    moment. Both supported dialects offer ON CONFLICT DO NOTHING, which beats
-    catching IntegrityError: in PostgreSQL a failed statement aborts the whole
-    transaction and forces a rollback.
-
-    This function and the engine URL are the only places that know which
-    database is in use.
+    moment. ON CONFLICT DO NOTHING beats catching IntegrityError: in PostgreSQL
+    a failed statement aborts the whole transaction and forces a rollback.
     """
     if not rows:
         return
@@ -82,10 +71,8 @@ async def _transform_with_cache(
 ) -> dict[str, str]:
     """Map every input string to its transformed form, calling out at most once.
 
-    Three things keep the call count down:
-      * duplicates inside the request collapse before anything else happens;
-      * everything already stored is fetched in a single SELECT;
-      * whatever is left is sent to the transformer as one batch.
+    Duplicates collapse first, cached values come back in one SELECT, and only
+    the remainder is sent.
     """
     wanted = _unique_in_order(values)
     if not wanted:

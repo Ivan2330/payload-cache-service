@@ -1,12 +1,4 @@
-"""Database tables.
-
-Two tables, one per thing worth caching:
-
-* ``transformed_strings`` - the expensive part: one row per distinct source
-  string, so the transformer is never asked about the same string twice.
-* ``payloads`` - the assembled answer, keyed by a hash of the request, so a
-  repeated POST costs one primary-key lookup and no work at all.
-"""
+"""Database tables: one for cached strings, one for assembled payloads."""
 
 from datetime import datetime
 
@@ -21,9 +13,7 @@ class Base(DeclarativeBase):
 class TransformedString(Base):
     __tablename__ = "transformed_strings"
 
-    # The source string is the natural key: it is what we look up by and it is
-    # unique by definition. A surrogate id would add a column and a second
-    # index without buying anything.
+    # Natural key: it is what we look up by, and it is unique by definition.
     source: Mapped[str] = mapped_column(String(1024), primary_key=True)
     transformed: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -34,9 +24,7 @@ class TransformedString(Base):
 class Payload(Base):
     __tablename__ = "payloads"
 
-    # SHA-256 of the canonical request. Deterministic, so two identical
-    # requests produce the same identifier without a lookup table and without
-    # a race between concurrent writers.
+    # SHA-256 of the canonical request; see service.payload_id.
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     output: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

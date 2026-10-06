@@ -1,9 +1,7 @@
 """Test fixtures.
 
-Every test runs against a real database - an in-memory SQLite one - rather
-than a mocked session. The caching logic is mostly SQL, and a mock would only
-assert that the code calls the functions the test expects, not that the cache
-works.
+Tests run against a real in-memory SQLite database, not a mocked session: the
+caching logic is mostly SQL, and a mock would assert the wrong thing.
 """
 
 from collections.abc import AsyncIterator, Sequence
@@ -21,11 +19,7 @@ from cache_service.models import Base
 
 
 class CountingTransformer:
-    """A transformer that records what it was asked to do.
-
-    Uppercase, like the real one, but with no latency and with the calls and
-    the values it received kept for assertions.
-    """
+    """Uppercase like the real one, but with no latency and a record of each call."""
 
     def __init__(self) -> None:
         self.calls = 0

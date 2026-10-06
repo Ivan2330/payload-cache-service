@@ -1,16 +1,7 @@
-"""The transformer function that stands in for an external service.
+"""Stands in for an external service.
 
-Two decisions here shape the whole service.
-
-1. The interface takes a *batch* of strings and returns a batch. The task asks
-   to minimise the number of calls, so the unit of work is "everything not
-   already cached", not "one string". A per-string signature would make the
-   call count equal to the number of cache misses instead of one.
-
-2. It is a Protocol with a concrete implementation injected through FastAPI's
-   dependency system, so tests substitute a counting fake and assert how often
-   it was really called. Caching that is not measured is a claim, not a
-   feature.
+Batch in, batch out: the unit of work is everything not already cached, so a
+request costs one call rather than one per cache miss.
 """
 
 import asyncio
@@ -25,10 +16,7 @@ class Transformer(Protocol):
 
 
 class UppercaseTransformer:
-    """Upper-cases strings, slowly, and counts how often it was asked to.
-
-    The sleep imitates the network round trip this would really be.
-    """
+    """Upper-cases strings, with a sleep standing in for a network round trip."""
 
     def __init__(self, latency_ms: int = 50) -> None:
         self._latency_s = latency_ms / 1000
@@ -36,7 +24,6 @@ class UppercaseTransformer:
 
     async def __call__(self, values: Sequence[str]) -> list[str]:
         if not values:
-            # Not calling the service at all is the cheapest call.
             return []
         self.calls += 1
         await asyncio.sleep(self._latency_s)
