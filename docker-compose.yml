@@ -1,0 +1,33 @@
+# Default: the service alone on SQLite - one command, no infrastructure.
+# PostgreSQL is included but not started by default:
+#   docker compose --profile postgres up
+# then point the service at it through CACHE_DATABASE_URL.
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CACHE_DATABASE_URL: ${CACHE_DATABASE_URL:-sqlite+aiosqlite:////srv/data/cache.db}
+    volumes:
+      - cache-data:/srv/data
+
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: cache
+      POSTGRES_PASSWORD: cache
+      POSTGRES_DB: cache
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cache"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  cache-data:
+  pg-data:
