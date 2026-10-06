@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 import httpx
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -73,9 +73,9 @@ def read_request(args: CliArgs) -> dict:
     try:
         body = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"Input is not valid JSON: {exc}") from exc
+        raise SystemExit(f"cache-cli: input is not valid JSON: {exc}") from exc
     if not isinstance(body, dict):
-        raise SystemExit("Input JSON must be an object with list_1 and list_2")
+        raise SystemExit("cache-cli: input JSON must be an object with list_1 and list_2")
     return body
 
 
@@ -96,12 +96,16 @@ async def run(args: CliArgs) -> int:
 
             created = await client.post("/payload", json=body)
             if created.status_code >= 400:
-                raise SystemExit(f"POST /payload failed: {created.status_code} {created.text}")
+                raise SystemExit(
+                    f"cache-cli: POST /payload failed with {created.status_code}: {created.text}"
+                )
             payload_id = created.json()["id"]
 
             fetched = await client.get(f"/payload/{payload_id}")
             if fetched.status_code >= 400:
-                raise SystemExit(f"GET /payload failed: {fetched.status_code} {fetched.text}")
+                raise SystemExit(
+                    f"cache-cli: GET /payload failed with {fetched.status_code}: {fetched.text}"
+                )
 
             results.append(
                 {
@@ -119,8 +123,48 @@ async def run(args: CliArgs) -> int:
     return 0
 
 
+def _long_option(location: tuple) -> str:
+    """Map a Pydantic error location back to the option the user actually typed."""
+    if not location:
+        return ""
+    key = str(location[0])
+    for name, field in CliArgs.model_fields.items():
+        alias = field.validation_alias
+        choices = [str(c) for c in alias.choices] if isinstance(alias, AliasChoices) else [name]
+        if key in choices:
+            return "--" + max(choices, key=len)
+    return key
+
+
 def main() -> int:
-    return asyncio.run(run(CliArgs()))
+    """Entry point. Argument and transport failures are reported, not raised.
+
+    A command line tool that answers a typo with a traceback is a tool nobody
+    wants to use, so each failure gets a message and a conventional exit code:
+    2 for bad arguments, 1 for everything else.
+    """
+    try:
+        args = CliArgs()
+    except ValidationError as exc:
+        for error in exc.errors():
+            option = _long_option(error["loc"])
+            message = error["msg"].removeprefix("Value error, ")
+            prefix = f"{option}: " if option else ""
+            print(f"cache-cli: {prefix}{message}", file=sys.stderr)
+        print("Try 'cache-cli --help' for the available options.", file=sys.stderr)
+        return 2
+
+    try:
+        return asyncio.run(run(args))
+    except httpx.HTTPError as exc:
+        print(f"cache-cli: cannot reach {args.host} ({type(exc).__name__})", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        detail = f"{exc.strerror}: {exc.filename}" if exc.filename else str(exc)
+        print(f"cache-cli: {detail}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
 
 
 if __name__ == "__main__":

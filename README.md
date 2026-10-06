@@ -80,6 +80,9 @@ Each iteration reports the identifier, whether the payload was reused, the
 round trip time and the output. Timings are included on purpose: with
 `--repeat` they make the effect of the cache visible rather than asserted.
 
+Failures are reported rather than raised - bad arguments exit 2, anything else
+exits 1, and no path prints a traceback.
+
 ---
 
 ## What the cache actually saves
