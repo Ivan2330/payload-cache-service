@@ -68,6 +68,19 @@ CACHE_DATABASE_URL=postgresql+asyncpg://cache:cache@localhost:5432/cache \
   uvicorn cache_service.main:app
 ```
 
+To run both in containers, address the database by its service name instead.
+No host port is involved, so this also works on a machine that already has
+PostgreSQL listening on 5432:
+
+```bash
+docker compose --profile postgres up -d postgres
+CACHE_DATABASE_URL=postgresql+asyncpg://cache:cache@postgres:5432/cache \
+  docker compose --profile postgres up -d --build api
+```
+
+Either way the tables are created on startup, and the only code that changes
+between the two databases is the conflict-aware insert in `service.py`.
+
 ## The CLI
 
 ```bash
