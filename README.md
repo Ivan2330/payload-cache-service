@@ -45,15 +45,19 @@ curl -X POST localhost:8000/payload \
   -d '{"list_1":["first string","second string"],"list_2":["other string","another string"]}'
 ```
 
-**Locally**:
+**Locally** - Python 3.12 or newer:
 
 ```bash
+python -m venv .venv && source .venv/bin/activate   # .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 uvicorn cache_service.main:app --reload
 pytest
 ```
 
 Interactive API documentation is at `http://localhost:8000/docs`.
+
+Both settings can be overridden by environment variable or a `.env` file;
+`.env.example` lists them with their defaults.
 
 **PostgreSQL instead of SQLite** - one variable, because every query is plain
 SQLAlchemy:
