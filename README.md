@@ -11,6 +11,27 @@ GET  /payload/{id}                                   ->  {"output": "..."}
 The payload is the interleaving of the two lists after each string has passed
 through a "transformer function" that stands in for an external service.
 
+### A worked example
+
+```
+POST /payload
+{
+  "list_1": ["first string", "second string", "third string"],
+  "list_2": ["other string", "another string", "last string"]
+}
+
+201  {"id": "831db673...1da401", "created": true, "message": "Payload created"}
+```
+
+```
+GET /payload/831db673...1da401
+
+200  {"output": "FIRST STRING, OTHER STRING, SECOND STRING, ANOTHER STRING, THIRD STRING, LAST STRING"}
+```
+
+Sending that same `POST` a second time returns the same identifier with
+`"created": false`, and the transformer is not called at all.
+
 ---
 
 ## Running it
@@ -54,6 +75,53 @@ echo '{"list_1":["a"],"list_2":["b"]}' | cache-cli --input -
 Each iteration reports the identifier, whether the payload was reused, the
 round trip time and the output. Timings are included on purpose: with
 `--repeat` they make the effect of the cache visible rather than asserted.
+
+---
+
+## What the cache actually saves
+
+The task asks to minimise the *number of calls* to the transformer, so that is
+what is measured rather than asserted. Every row below comes out of the test
+suite:
+
+| Scenario | Strings in | Calls | Batches sent |
+| --- | --- | --- | --- |
+| one request, six distinct strings | 6 | 1 | `[a d b e c f]` |
+| one request, the same string four times | 4 | 1 | `[x]` |
+| the same request sent twice | 4 | 1 | `[a b]` |
+| second request shares one string with the first | 4 | 2 | `[a b]`, `[c]` |
+| second request fully covered by the cache | 6 | 1 | `[a c b d]` |
+
+Two things to read off that table. The call count follows the number of
+*distinct uncached* strings rather than the size of the request - six strings
+cost one call, and a request the cache already covers costs none. And in the
+overlapping row the second batch is `[c]` alone: the two strings already
+stored were not sent again.
+
+End to end, over an ASGI transport, with the transformer's simulated latency
+at its default 50 ms:
+
+```
+POST #1   201    75.9 ms   created: true
+POST #2   201     3.1 ms   created: false      <- no transformer call
+GET       200     3.1 ms   output: FIRST STRING, OTHER STRING, ...
+```
+
+## Tests
+
+```
+pytest             16 passed
+ruff check .       All checks passed
+```
+
+* `test_pure.py` - interleaving and identifier, no I/O. Covers order
+  sensitivity and the collision that concatenating the lists before hashing
+  would cause: `["ab"], ["c"]` against `["a"], ["bc"]`.
+* `test_service.py` - caching against a real database, asserting the call
+  count and the contents of each batch. These are the tests that fail if the
+  cache quietly stops working while the output stays correct.
+* `test_api.py` - the endpoints end to end: status codes, the `created` flag,
+  422 on mismatched and on empty lists, 404 on an unknown identifier.
 
 ---
 
