@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "cache-service"
 version = "0.1.0"
-description = "FastAPI microservice that caches the results of an external string transformer."
+description = "FastAPI microservice that caches external transformer results and generated payloads, on SQLite or PostgreSQL."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
